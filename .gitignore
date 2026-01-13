@@ -1,0 +1,18 @@
+@"
+# data (local only)
+*.csv
+*.xlsx
+*.xls
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.env
+"@ | Out-File -Encoding utf8 .gitignore
