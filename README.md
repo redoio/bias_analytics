@@ -1,5 +1,4 @@
-# bias_analysis
-
+# Introduction
 Compute group-level bias metrics from a cohort built from **demographics.csv** (plus optional commitments tables).
 
 This repo avoids hard-coding: you can compare *any* two values in your group column (e.g., any two ethnicities) and define outcomes from *any* demographics column.
