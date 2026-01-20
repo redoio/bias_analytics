@@ -146,5 +146,31 @@ The CLI prints JSON with:
 - `table` : the 2×2 table `{a,b,c,d}`
 - `metrics` : computed metrics + CIs
 
+## Statistical notes & references
+
+### Continuity correction
+
+When one or more cells in a 2×2 contingency table are zero, odds ratios and relative risks are mathematically undefined.  
+By default, this repo returns `NaN` in those cases rather than silently imputing values.
+
+If the user explicitly passes `--continuity-correction` (e.g. `0.5`), a standard continuity correction is applied to enable finite estimation of log-odds–based measures and confidence intervals. This behavior is opt-in and the correction value is echoed in the output for transparency.
+
+This approach follows established statistical methodology for sparse contingency tables and small-sample binomial models.
+
+### References
+
+- **Anscombe, F. J. (1956).**  
+  *On estimating binomial response relations.*  
+  **Biometrika**, 43(3–4), 461–464.  
+  (Primary methodological reference for continuity correction in binomial/logistic settings.)
+
+- **Agresti, A. (2013).**  
+  *Categorical Data Analysis* (3rd ed.). Wiley.  
+  (Modern textbook treatment of sparse contingency tables, odds ratios, and continuity corrections.)
+
+- **Szumilas, M. (2010).**  
+  *Explaining Odds Ratios.*  
+  *Journal of the Canadian Academy of Child and Adolescent Psychiatry*, 19(3), 227–229.  
+  (Clear explanation of odds ratios and their interpretation.)
 
 
