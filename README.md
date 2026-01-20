@@ -146,37 +146,5 @@ The CLI prints JSON with:
 - `table` : the 2×2 table `{a,b,c,d}`
 - `metrics` : computed metrics + CIs
 
-## PowerShell line continuation
 
-Use backtick ( `` ` `` ) for multi-line commands, not `^`.
-
-## Repo layout
-
-```
-bias_analysis/
-  __init__.py
-  cli.py
-  cohort.py
-  contingency.py
-  io.py
-  metrics.py
-  logistic.py
-tests/
-  test_contingency.py
-  test_metrics.py
-```
-
-## Development
-
-Run tests:
-
-```bash
-pytest -q
-```
-
-## Next steps 
-
-- Wire **rate ratio** to person-time derived from commitments / time-served fields
-- Add a **logistic regression CLI mode** (covariates + encoding)
-- Extend filter operators and improve dtype handling in `read_table()`
 
