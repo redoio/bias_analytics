@@ -172,6 +172,20 @@ def main() -> None:
         default=None,
         help="Optional continuity correction (e.g., 0.5). If omitted, zero cells yield NaN metrics.",
     )
+    
+    ap.add_argument(
+        "--chi2-yates",
+        dest="chi2_yates",
+        action="store_true",
+        help="Use Yates continuity correction for chi-square (2x2). Default: on.",
+    )
+    ap.add_argument(
+        "--no-chi2-yates",
+        dest="chi2_yates",
+        action="store_false",
+        help="Disable Yates correction for chi-square.",
+    )
+    ap.set_defaults(chi2_yates=True)
 
     args = ap.parse_args()
 
@@ -239,6 +253,7 @@ def main() -> None:
         t,
         alpha=args.alpha,
         continuity_correction=args.continuity_correction,
+        chi2_yates=args.chi2_yates,
     )
 
     out = {
@@ -259,6 +274,8 @@ def main() -> None:
             "current_loaded": bool(args.current),
             "prior_loaded": bool(args.prior),
             "continuity_correction": args.continuity_correction,
+            "chi2_yates": bool(args.chi2_yates),
+
         },
         "table": t_dict,
         "metrics": metrics,
