@@ -4,7 +4,7 @@ from dataclasses import asdict
 from typing import Any, Dict, Optional
 import math
 
-from scipy.stats import norm
+from scipy.stats import norm, chi2_contingency 
 
 from .contingency import Contingency2x2
 
@@ -167,14 +167,40 @@ def rate_ratio_and_ci(
     }
 
 
+def chi_square_test(
+    t: Contingency2x2,
+    *,
+    yates: bool = True,
+) -> Dict[str, Any]:
+    """
+    Pearson chi-square test of independence for a 2x2 table.
+    By default uses Yates continuity correction (recommended for 2x2).
+    """
+    table = [[int(t.a), int(t.b)], [int(t.c), int(t.d)]]
+    chi2, p, dof, _expected = chi2_contingency(table, correction=bool(yates))
+    return {
+        "chi2_stat": float(chi2),
+        "chi2_p_value": float(p),
+        "chi2_dof": int(dof),
+        "chi2_yates_correction": bool(yates),
+    }
+
+
 def compute_bias_metrics(
     t: Contingency2x2,
     *,
     alpha: float = 0.05,
     continuity_correction: Optional[float] = None,
+    chi2_yates: bool = True,
 ) -> Dict[str, Any]:
     out: Dict[str, Any] = {"table": asdict(t)}
     out.update(odds_ratio_and_ci(t, alpha=alpha, continuity_correction=continuity_correction))
     out.update(relative_risk_and_ci(t, alpha=alpha, continuity_correction=continuity_correction))
+
+    # New:
+    out.update(chi_square_test(t, yates=chi2_yates))
+
     # rate ratio requires person-time inputs, so not computed here
     return out
+
+

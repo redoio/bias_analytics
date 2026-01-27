@@ -16,6 +16,7 @@ This repo avoids hard-coding: you can compare *any* two values in your group col
   - Relative Risk (RR) + log CI
   - Rate Ratio scaffold (requires person-time inputs; not wired into CLI yet)
 - Optional continuity correction (only if explicitly provided)
+- Chi-square test (χ² statistic, p-value, df; Yates on by default)
 
 ## Install
 
