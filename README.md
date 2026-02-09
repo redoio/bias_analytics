@@ -189,6 +189,8 @@ python -m bias_analysis.cli `
   --threshold-op ge `
   --covariates "age" "sentencing_county" "offense_category" `
   --drop-missing any
+  | Out-File -Encoding utf8 ./logit_white_vs_black_ge10.json
+
 
 ## Continuity correction (zero cells)
 

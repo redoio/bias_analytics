@@ -130,6 +130,39 @@ def _contingency_to_dict(t: Any) -> Dict[str, Any]:
     return d or {"repr": repr(t)}
 
 
+def _load_covariates_spec(args: argparse.Namespace) -> tuple[List[str], List[str], List[str]]:
+    """
+    Resolve covariates from:
+      - --covariates col1 col2 ...
+      - --covariates-file covariates.json
+
+    covariates.json format:
+      {
+        "covariates": ["age", "county"],
+        "force_numeric": ["age"],
+        "force_categorical": ["county"]
+      }
+    """
+    covariates: List[str] = []
+    force_numeric: List[str] = []
+    force_categorical: List[str] = []
+
+    if getattr(args, "covariates", None):
+        covariates.extend(args.covariates)
+
+    if getattr(args, "covariates_file", None):
+        with open(args.covariates_file, "r", encoding="utf-8-sig") as f:
+            spec = json.load(f)
+        covariates.extend(spec.get("covariates", []))
+        force_numeric.extend(spec.get("force_numeric", []))
+        force_categorical.extend(spec.get("force_categorical", []))
+
+    # de-dupe, preserve order, drop empties
+    covariates = list(dict.fromkeys([c for c in covariates if c]))
+
+    return covariates, force_numeric, force_categorical
+
+
 def main() -> None:
     ap = argparse.ArgumentParser("bias-analysis")
 
@@ -172,7 +205,7 @@ def main() -> None:
         default=None,
         help="Optional continuity correction (e.g., 0.5). If omitted, zero cells yield NaN metrics.",
     )
-    
+
     ap.add_argument(
         "--chi2-yates",
         dest="chi2_yates",
@@ -187,8 +220,46 @@ def main() -> None:
     )
     ap.set_defaults(chi2_yates=True)
 
+    # NEW: Logistic regression mode
+    ap.add_argument(
+        "--mode",
+        choices=["2x2", "logit"],
+        default="2x2",
+        help="Analysis mode: 2x2 (default) or logit",
+    )
+
+    ap.add_argument(
+        "--covariates",
+        nargs="*",
+        default=None,
+        help="Covariate column names for logistic regression",
+    )
+
+    ap.add_argument(
+        "--covariates-file",
+        default=None,
+        help="JSON file specifying covariates and encoding rules",
+    )
+
+    ap.add_argument(
+        "--drop-missing",
+        choices=["any", "outcome", "covariates", "none"],
+        default="any",
+        help="How to drop rows with missing values (logit mode)",
+    )
+
+    ap.add_argument(
+        "--no-intercept",
+        action="store_true",
+        help="Disable intercept in logit model (default: intercept ON).",
+    )
+
     args = ap.parse_args()
 
+    # Resolve covariates early (needed for keep_cols)
+    covariates, force_numeric, force_categorical = _load_covariates_spec(args)
+
+    # --- Load inputs ---
     demo = read_table(args.demographics)
 
     # Load commitments if provided (even if unused now)
@@ -202,7 +273,7 @@ def main() -> None:
     if len(demo) < args.min_cases:
         raise ValueError(f"Filtered dataset has {len(demo)} rows (< {args.min_cases}).")
 
-    # Build cohort table (app Step 3 + Step 4)
+    # --- Build cohort table (app Step 3 + Step 4) ---
     spec = CohortSpec(id_col=args.id_col, group_col=args.group_col, outcome_col="outcome")
 
     cohort = build_cohort_table(
@@ -218,7 +289,7 @@ def main() -> None:
             thr=args.outcome_threshold,
             op=args.threshold_op,
         ),
-        keep_cols=[args.outcome_col],
+        keep_cols=list(dict.fromkeys([args.outcome_col] + covariates)),
     )
 
     # Restrict to the two groups (matches app behavior after selecting groups)
@@ -237,49 +308,97 @@ def main() -> None:
     if missing:
         raise ValueError(f"Missing group(s) in filtered cohort: {missing}. Present: {sorted(groups_present)}")
 
-    # Build 2x2
-    t = build_2x2(
-        cohort,
-        group_col=spec.group_col,
-        outcome_col=spec.outcome_col,
-        exposed_value=args.exposed,
-        unexposed_value=args.unexposed,
-    )
+    # -------------------------
+    # MODE SWITCH (after cohort)
+    # -------------------------
+    if args.mode == "2x2":
+        t = build_2x2(
+            cohort,
+            group_col=spec.group_col,
+            outcome_col=spec.outcome_col,
+            exposed_value=args.exposed,
+            unexposed_value=args.unexposed,
+        )
 
-    t_dict = _contingency_to_dict(t)
+        t_dict = _contingency_to_dict(t)
 
-    # Compute metrics (requires updated metrics.py to accept continuity_correction)
-    metrics = compute_bias_metrics(
-        t,
-        alpha=args.alpha,
-        continuity_correction=args.continuity_correction,
-        chi2_yates=args.chi2_yates,
-    )
+        metrics = compute_bias_metrics(
+            t,
+            alpha=args.alpha,
+            continuity_correction=args.continuity_correction,
+            chi2_yates=args.chi2_yates,
+        )
 
-    out = {
-        "inputs": {
-            "id_col": args.id_col,
-            "group_col": args.group_col,
-            "exposed": args.exposed,
-            "unexposed": args.unexposed,
-            "outcome_col": args.outcome_col,
-            "outcome_positive": args.outcome_positive,
-            "outcome_threshold": args.outcome_threshold,
-            "threshold_op": args.threshold_op,
-            "n_filtered_rows": int(len(demo)),
-            "n_used_rows": int(len(cohort)),
-            "min_cases": int(args.min_cases),
-            "filters": filters,
-            "cdc_ids_restricted": bool(args.cdc_ids),
-            "current_loaded": bool(args.current),
-            "prior_loaded": bool(args.prior),
-            "continuity_correction": args.continuity_correction,
-            "chi2_yates": bool(args.chi2_yates),
+        out = {
+            "inputs": {
+                "mode": args.mode,
+                "id_col": args.id_col,
+                "group_col": args.group_col,
+                "exposed": args.exposed,
+                "unexposed": args.unexposed,
+                "outcome_col": args.outcome_col,
+                "outcome_positive": args.outcome_positive,
+                "outcome_threshold": args.outcome_threshold,
+                "threshold_op": args.threshold_op,
+                "n_filtered_rows": int(len(demo)),
+                "n_used_rows": int(len(cohort)),
+                "min_cases": int(args.min_cases),
+                "filters": filters,
+                "cdc_ids_restricted": bool(args.cdc_ids),
+                "current_loaded": bool(args.current),
+                "prior_loaded": bool(args.prior),
+                "continuity_correction": args.continuity_correction,
+                "chi2_yates": bool(args.chi2_yates),
+            },
+            "table": t_dict,
+            "metrics": metrics,
+        }
 
-        },
-        "table": t_dict,
-        "metrics": metrics,
-    }
+    else:
+        from .logistic import fit_logit
+
+        cohort = cohort.copy()
+        cohort["group"] = (cohort[spec.group_col].astype(str) == str(args.exposed)).astype(int)
+
+        logit_out = fit_logit(
+            df=cohort,
+            outcome_col=spec.outcome_col,  # derived 0/1 "outcome"
+            group_indicator_col="group",
+            covariates=covariates,
+            drop_missing=args.drop_missing,
+            add_intercept=(not args.no_intercept),
+            force_numeric=force_numeric or None,
+            force_categorical=force_categorical or None,
+            robust_se=True,
+        )
+
+        out = {
+            "inputs": {
+                "mode": args.mode,
+                "id_col": args.id_col,
+                "group_col": args.group_col,
+                "exposed": args.exposed,
+                "unexposed": args.unexposed,
+                "outcome_col": args.outcome_col,
+                "outcome_positive": args.outcome_positive,
+                "outcome_threshold": args.outcome_threshold,
+                "threshold_op": args.threshold_op,
+                "n_filtered_rows": int(len(demo)),
+                "n_used_rows": int(len(cohort)),
+                "min_cases": int(args.min_cases),
+                "filters": filters,
+                "cdc_ids_restricted": bool(args.cdc_ids),
+                "current_loaded": bool(args.current),
+                "prior_loaded": bool(args.prior),
+                "covariates": covariates,
+                "covariates_file": args.covariates_file,
+                "drop_missing": args.drop_missing,
+                "intercept": (not args.no_intercept),
+                "force_numeric": force_numeric,
+                "force_categorical": force_categorical,
+            },
+            "logit": logit_out,
+        }
 
     print(json.dumps(out, indent=2, default=str))
 
