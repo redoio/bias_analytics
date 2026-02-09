@@ -1,3 +1,5 @@
+# bias_analysis/__init__.py
+
 from .io import read_table
 from .cohort import build_cohort_table
 from .contingency import build_2x2
@@ -8,6 +10,8 @@ from .metrics import (
     compute_bias_metrics,
 )
 
+from .logistic import build_design_matrix, fit_logit
+
 __all__ = [
     "read_table",
     "build_cohort_table",
@@ -16,4 +20,7 @@ __all__ = [
     "rate_ratio_and_ci",
     "relative_risk_and_ci",
     "compute_bias_metrics",
+    "fit_logit",
+    "build_design_matrix",
 ]
+

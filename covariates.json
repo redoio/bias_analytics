@@ -1,0 +1,12 @@
+{
+  "covariates": [
+    "controlling case sentencing county",
+    "offense category"
+  ],
+  "force_categorical": [
+    "controlling case sentencing county",
+    "offense category"
+  ]
+}
+
+
