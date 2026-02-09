@@ -168,11 +168,11 @@ def main() -> None:
 
     ap.add_argument("--demographics", required=True)
 
-    # Optional: commitments inputs (loaded and passed through, used later)
+    # Optional: commitments inputs 
     ap.add_argument("--current", default=None, help="Optional: current_commitments.csv/xlsx")
     ap.add_argument("--prior", default=None, help="Optional: prior_commitments.csv/xlsx")
 
-    # Optional: restrict to a subset of CDC IDs (NOT how the app defaults)
+    # Optional: restrict to a subset of CDC IDs 
     ap.add_argument("--cdc-ids", nargs="*", default=None, help="Optional: restrict to these CDC IDs.")
 
     ap.add_argument("--id-col", default="cdcno")
@@ -180,7 +180,7 @@ def main() -> None:
     ap.add_argument("--exposed", required=True)
     ap.add_argument("--unexposed", required=True)
 
-    # Outcome specification (Aparna requirement)
+    # Outcome specification 
     ap.add_argument("--outcome-col", required=True)
     ap.add_argument("--outcome-positive", default=None, help="Categorical: outcome=1 if outcome-col equals this value.")
     ap.add_argument("--outcome-threshold", type=float, default=None, help="Numeric: threshold value.")
@@ -259,7 +259,7 @@ def main() -> None:
     # Resolve covariates early (needed for keep_cols)
     covariates, force_numeric, force_categorical = _load_covariates_spec(args)
 
-    # --- Load inputs ---
+    # Load inputs 
     demo = read_table(args.demographics)
 
     # Load commitments if provided (even if unused now)
@@ -273,7 +273,7 @@ def main() -> None:
     if len(demo) < args.min_cases:
         raise ValueError(f"Filtered dataset has {len(demo)} rows (< {args.min_cases}).")
 
-    # --- Build cohort table (app Step 3 + Step 4) ---
+    #  Build cohort table 
     spec = CohortSpec(id_col=args.id_col, group_col=args.group_col, outcome_col="outcome")
 
     cohort = build_cohort_table(
@@ -308,9 +308,8 @@ def main() -> None:
     if missing:
         raise ValueError(f"Missing group(s) in filtered cohort: {missing}. Present: {sorted(groups_present)}")
 
-    # -------------------------
     # MODE SWITCH (after cohort)
-    # -------------------------
+    
     if args.mode == "2x2":
         t = build_2x2(
             cohort,
