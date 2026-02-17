@@ -17,6 +17,12 @@ This repo avoids hard-coding: you can compare *any* two values in your group col
   - Rate Ratio scaffold (requires person-time inputs; not wired into CLI yet)
 - Optional continuity correction (only if explicitly provided)
 - Chi-square test (χ² statistic, p-value, df; Yates on by default)
+  - Chi-square is computed via scipy.stats.chi2_contingency with optional Yates continuity correction.
+  - Chi-square is reported alongside OR/RR to assess independence of group and outcome.
+- Logistic regression mode (`--mode logit`)
+  - Output includes coefficient, odds ratio, confidence interval, p-value, and number of observations used. 
+  - **(adjusted odds ratios)** for adjusted odds ratios controlling for user-specified covariates (auto one-hot encoding for categorical covariates)
+
 
 ## Install
 
@@ -49,6 +55,39 @@ python -m bias_analysis.cli --help
 - `--current` : current_commitments table (loaded and passed through; used later)
 - `--prior` : prior_commitments table (loaded and passed through; used later)
 - `--cdc-ids` : optional list of CDC IDs to restrict the cohort
+
+## CLI Arguments (Summary)
+
+### Core inputs
+- `--demographics` (required): CSV/XLSX with demographic data
+- `--group-col`: column defining groups (e.g., ethnicity)
+- `--exposed`: value treated as exposed group
+- `--unexposed`: value treated as unexposed group
+
+### Outcome definition (one required)
+- `--outcome-col`: column used to derive outcome
+- `--outcome-positive`: categorical positive value
+- `--outcome-threshold`: numeric threshold
+- `--threshold-op`: comparison operator (`ge`, `gt`, `le`, `lt`, `eq`, `ne`)
+
+### Analysis mode
+- `--mode {2x2,logit}` (default: `2x2`)
+- `--covariates`: list of covariate columns (logit mode only)
+- `--covariates-file`: JSON file listing covariates
+- `--drop-missing {any,outcome,covariates,none}`
+
+### Statistical options
+- `--alpha`: significance level (default 0.05)
+- `--continuity-correction`: optional float (e.g., 0.5)
+- `--no-chi2-yates`: disable Yates correction for chi-square
+
+### Filtering
+- `--filters-file`: JSON filter file
+- `--filters-json`: inline JSON filters (advanced)
+
+### Data restriction
+- `--cdc-ids`: restrict analysis to specific CDC IDs
+- `--min-cases`: minimum rows after filtering
 
 ## Filters
 
@@ -125,6 +164,33 @@ python -m bias_analysis.cli `
   --outcome-threshold 10 `
   --threshold-op ge
 ```
+## Logistic regression mode (adjusted OR)
+
+In addition to the default **2×2** mode, the CLI supports:
+
+- `--mode logit` to fit a logistic regression:
+  - Outcome: the derived 0/1 `outcome` (from `--outcome-*` flags)
+  - Exposure: a group indicator (1 = exposed, 0 = unexposed)
+  - Covariates: user-provided columns, automatically encoded:
+    - numeric → kept numeric (`to_numeric(errors="coerce")`)
+    - categorical → one-hot encoded (`get_dummies(drop_first=True)`)
+
+### Example: adjusted OR controlling for age + county + offense category
+
+```powershell
+python -m bias_analysis.cli `
+  --mode logit `
+  --demographics demographics.csv `
+  --group-col ethnicity `
+  --exposed "White" `
+  --unexposed "Black" `
+  --outcome-col "aggregate sentence in years" `
+  --outcome-threshold 10 `
+  --threshold-op ge `
+  --covariates "age" "sentencing_county" "offense_category" `
+  --drop-missing any
+  | Out-File -Encoding utf8 ./logit_white_vs_black_ge10.json
+
 
 ## Continuity correction (zero cells)
 
@@ -173,5 +239,4 @@ This approach follows established statistical methodology for sparse contingency
   *Explaining Odds Ratios.*  
   *Journal of the Canadian Academy of Child and Adolescent Psychiatry*, 19(3), 227–229.  
   (Clear explanation of odds ratios and their interpretation.)
-
 
